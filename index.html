@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>C'Mélodie · Mesures</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  /* 手机单手操作：分类 → 款号 → 测量；三个页签固定在底部 */
+  --bg:#F4F5F7; --surface:#FFFFFF; --ink:#172334; --muted:#64748B; --line:#DDE2E8;
+  --accent:#2563EB; --accent-ink:#FFFFFF; --good:#2F7D4F; --warn:#B7791F;
+  --font:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.4;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 14px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+header h1{font-size:18px;margin:0;flex:1}
+.back{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 12px}
+.chip{font-size:12px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--line);color:var(--muted);white-space:nowrap}.chip.ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}.chip.warn{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+main{padding:12px 14px;max-width:640px;margin:0 auto}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{border:0;background:none;padding:12px 4px;font-size:14px;color:var(--muted)}
+nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:700}
+.cats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left}
+.cat b{display:block;font-size:15px}
+.cat span{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cat.done{border-color:var(--good)}
+.list{display:grid;gap:8px}
+.item{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:left;width:100%}
+.item b{flex:1}
+.item small{color:var(--muted)}
+.ok{color:var(--good);font-weight:700;font-size:14px}
+.search{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-bottom:10px}
+.h2{font-size:13px;color:var(--muted);margin:16px 0 8px;font-weight:700;letter-spacing:.03em}
+.empty{text-align:center;color:var(--muted);padding:24px;background:var(--surface);border:1px dashed var(--line);border-radius:12px}
+/* form */
+.form{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
+.fhead{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.fhead b{font-size:22px}
+.fhead span{font-size:13px;color:var(--muted)}
+.dia{display:block;width:100%;max-width:230px;height:auto;margin:0 auto}
+.fields{display:grid;gap:8px;margin-top:6px}
+.fld{display:grid;grid-template-columns:30px 1fr 110px;align-items:center;gap:8px}
+.let{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:14px;display:grid;place-items:center}
+.let.g{background:var(--ink)}
+.fld label{font-size:15px}
+.fld label small{display:block;font-size:12px;color:var(--muted)}
+.fld input{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:20px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;background:var(--bg)}
+.fld input:focus{border-color:var(--accent);outline:none;background:var(--surface)}
+.fld.warn input{border-color:var(--warn)}
+.tog{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 4px;font-size:14px}
+.sw{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.sw button{border:0;background:var(--surface);padding:7px 14px;font-size:14px}
+.sw button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.msg{font-size:14px;margin-top:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--warn) 15%,transparent);display:none}
+.msg.show{display:block}
+.save{width:100%;margin-top:12px;border:0;border-radius:12px;padding:15px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:16px}
+.sec{width:100%;margin-top:8px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--surface)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:16px;margin:0 0 6px}
+.card p{font-size:14px;color:var(--muted);margin:0 0 10px}
+.btn{border:0;border-radius:10px;padding:12px 14px;background:var(--accent);color:#fff;font-weight:700;width:100%;margin-top:6px}
+.btn.l{background:var(--surface);color:var(--ink);border:1px solid var(--line);font-weight:500}
+input.t{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-bottom:8px}
+select.t{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <button class="back" id="back" hidden aria-label="返回">←</button>
+  <h1 id="title">Mesures · 测量</h1>
+  <span class="count" id="count"></span><span class="chip" id="sync"></span>
+</header>
+<main id="main"></main>
+<nav class="tabs">
+  <button data-t="saisie" aria-current="page">录入 Saisie</button>
+  <button data-t="fiches">记录 Fiches</button>
+  <button data-t="export">设置 Réglages</button>
+</nav>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+var DIA={"top": "<g transform=\"translate(30,43)\"><path d=\"M65 30 L38 40 L12 78 L39 96 L53 77 L50 180 H130 L127 77 L141 96 L168 78 L142 40 L115 30 Q90 57 65 30Z\" fill=\"#f1f3f5\" stroke=\"#344054\" stroke-width=\"1.5\"/><path d=\"M53 88 L127 88\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"53\" cy=\"88\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"127\" cy=\"88\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"88.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"92.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">A</text><path d=\"M50 177 L130 177\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"50\" cy=\"177\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"130\" cy=\"177\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"177.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"181.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">C</text><path d=\"M153 30 L153 180\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"153\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"153\" cy=\"180\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"153.0\" cy=\"105.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"153.0\" y=\"109.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">B</text></g>", "pantalon": "<g transform=\"translate(30,43)\"><path d=\"M52 30 H128 L145 190 H99 L90 95 L81 190 H35 Z\" fill=\"#f1f3f5\" stroke=\"#344054\" stroke-width=\"1.5\"/><path d=\"M52 30 L128 30\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"52\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"128\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"30.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"34.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">A</text><path d=\"M46 66 L134 66\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"46\" cy=\"66\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"134\" cy=\"66\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"66.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"70.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">C</text><path d=\"M43 105 L84 105\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"43\" cy=\"105\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"84\" cy=\"105\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"63.5\" cy=\"105.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"63.5\" y=\"109.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">D</text><path d=\"M157 30 L157 190\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"157\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"157\" cy=\"190\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"157.0\" cy=\"110.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"157.0\" y=\"114.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">E</text></g>", "jupe": "<g transform=\"translate(30,43)\"><path d=\"M55 30 H125 L155 185 Q90 198 25 185Z\" fill=\"#f1f3f5\" stroke=\"#344054\" stroke-width=\"1.5\"/><path d=\"M55 30 L125 30\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"55\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"125\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"30.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"34.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">A</text><path d=\"M44 85 L136 85\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"44\" cy=\"85\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"136\" cy=\"85\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"85.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"89.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">C</text><path d=\"M166 30 L166 186\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"166\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"166\" cy=\"186\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"166.0\" cy=\"108.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"166.0\" y=\"112.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">D</text></g>", "robe": "<g transform=\"translate(30,43)\"><path d=\"M65 24 H77 Q90 52 103 24 H115 L130 64 L113 90 L151 190 Q90 203 29 190 L67 90 L50 64Z\" fill=\"#f1f3f5\" stroke=\"#344054\" stroke-width=\"1.5\"/><path d=\"M55 66 L125 66\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"55\" cy=\"66\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"125\" cy=\"66\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"66.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"70.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">A</text><path d=\"M67 90 L113 90\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"67\" cy=\"90\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"113\" cy=\"90\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"90.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"94.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">B</text><path d=\"M52 130 L128 130\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"52\" cy=\"130\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"128\" cy=\"130\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"130.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"134.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">C</text><path d=\"M164 24 L164 190\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"164\" cy=\"24\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"164\" cy=\"190\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"164.0\" cy=\"107.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"164.0\" y=\"111.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">D</text></g>", "veste": "<g transform=\"translate(30,43)\"><path d=\"M66 30 L37 42 L12 165 L40 174 L55 92 L50 185 H130 L125 92 L140 174 L168 165 L143 42 L114 30 Q90 55 66 30Z\" fill=\"#f1f3f5\" stroke=\"#344054\" stroke-width=\"1.5\"/><path d=\"M55 86 L125 86\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"55\" cy=\"86\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"125\" cy=\"86\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"86.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"90.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">A</text><path d=\"M66 30 L114 30\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"66\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"114\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"30.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"34.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">C</text><path d=\"M144 42 L168 165\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"144\" cy=\"42\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"168\" cy=\"165\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"156.0\" cy=\"103.5\" r=\"10\" fill=\"#2563eb\"/><text x=\"156.0\" y=\"107.5\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">D</text><path d=\"M5 30 L5 185\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"5\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"5\" cy=\"185\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"5.0\" cy=\"107.5\" r=\"10\" fill=\"#2563eb\"/><text x=\"5.0\" y=\"111.5\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">B</text></g>", "chemise": "<g transform=\"translate(30,43)\"><path d=\"M66 30 L37 42 L12 165 L40 174 L55 92 L50 185 H130 L125 92 L140 174 L168 165 L143 42 L114 30 Q90 55 66 30Z\" fill=\"#f1f3f5\" stroke=\"#344054\" stroke-width=\"1.5\"/><path d=\"M55 86 L125 86\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"55\" cy=\"86\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"125\" cy=\"86\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"86.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"90.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">A</text><path d=\"M50 182 L130 182\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"50\" cy=\"182\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"130\" cy=\"182\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"182.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"186.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">C</text><path d=\"M144 42 L168 165\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"144\" cy=\"42\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"168\" cy=\"165\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"156.0\" cy=\"103.5\" r=\"10\" fill=\"#2563eb\"/><text x=\"156.0\" y=\"107.5\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">D</text><path d=\"M5 30 L5 185\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"5\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"5\" cy=\"185\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"5.0\" cy=\"107.5\" r=\"10\" fill=\"#2563eb\"/><text x=\"5.0\" y=\"111.5\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">B</text></g>", "pull": "<g transform=\"translate(30,43)\"><path d=\"M66 30 L37 42 L12 165 L40 174 L55 92 L50 185 H130 L125 92 L140 174 L168 165 L143 42 L114 30 Q90 55 66 30Z\" fill=\"#f1f3f5\" stroke=\"#344054\" stroke-width=\"1.5\"/><path d=\"M55 86 L125 86\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"55\" cy=\"86\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"125\" cy=\"86\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"90.0\" cy=\"86.0\" r=\"10\" fill=\"#2563eb\"/><text x=\"90.0\" y=\"90.0\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">A</text><path d=\"M144 42 L168 165\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"144\" cy=\"42\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"168\" cy=\"165\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"156.0\" cy=\"103.5\" r=\"10\" fill=\"#2563eb\"/><text x=\"156.0\" y=\"107.5\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">C</text><path d=\"M5 30 L5 185\" stroke=\"#2563eb\" stroke-width=\"2\"/><circle cx=\"5\" cy=\"30\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"5\" cy=\"185\" r=\"2.5\" fill=\"#2563eb\"/><circle cx=\"5.0\" cy=\"107.5\" r=\"10\" fill=\"#2563eb\"/><text x=\"5.0\" y=\"111.5\" font-family=\"Arial\" font-size=\"12\" text-anchor=\"middle\" fill=\"white\">B</text></g>"};
+/* 模板：字母对应示意图 */
+var TPL={
+  top:     {n:"T-shirt / Top",     f:[["A","poitrine","胸宽","Poitrine",1],["B","longueur","衣长","Longueur",1],["C","bas","下摆宽","Bas",1]]},
+  chemise: {n:"Chemise / Blouse",  f:[["A","poitrine","胸宽","Poitrine",1],["B","longueur","衣长","Longueur",1],["C","bas","下摆宽","Bas",1],["D","manche","袖长","Manche",0]]},
+  pull:    {n:"Pull / Gilet",      f:[["A","poitrine","胸宽","Poitrine",1],["B","longueur","衣长","Longueur",1],["C","manche","袖长","Manche",0]]},
+  veste:   {n:"Veste / Manteau",   f:[["A","poitrine","胸宽","Poitrine",1],["B","longueur","衣长","Longueur",1],["C","epaules","肩宽","Épaules",0],["D","manche","袖长","Manche",1]]},
+  robe:    {n:"Robe",              f:[["A","poitrine","胸宽","Poitrine",1],["B","taille","腰宽","Taille",0],["C","hanches","臀宽","Hanches",1],["D","longueur","裙长","Longueur",1]]},
+  pantalon:{n:"Pantalon / Short",  f:[["A","taille_repos","腰宽（自然）","Taille au repos",1],["B","taille_etiree","腰宽（拉伸）","Taille étirée",2],["C","hanches","臀宽","Hanches",1],["D","cuisse","大腿宽","Cuisse",0],["E","longueur","裤长","Longueur",1]]},
+  jupe:    {n:"Jupe",              f:[["A","taille_repos","腰宽（自然）","Taille au repos",1],["B","taille_etiree","腰宽（拉伸）","Taille étirée",2],["C","hanches","臀宽","Hanches",1],["D","longueur","裙长","Longueur",1]]}
+};
+/* req: 1 必填, 0 选填, 2 松紧腰时必填 */
+var RANGE={poitrine:[35,95],longueur:[35,165],bas:[35,150],manche:[5,85],epaules:[30,70],taille:[30,95],hanches:[40,100],taille_repos:[25,85],taille_etiree:[30,110],cuisse:[20,60],poids:[30,2500]};
+var COLS=["poitrine","taille_repos","taille_etiree","taille","hanches","cuisse","longueur","bas","epaules","manche"];
+var FRN={poitrine:"largeur poitrine",taille_repos:"largeur taille au repos",taille_etiree:"largeur taille étirée",taille:"largeur taille",hanches:"largeur hanches",cuisse:"largeur cuisse",longueur:"longueur",bas:"largeur bas",epaules:"largeur épaules",manche:"longueur manche"};
+function tplOf(cat){
+  var c=(cat||"").toUpperCase();
+  if(/PANTALON|SHORT|LEGGING|PANTACOURT|JEAN|JOGG|BERMUDA|CORSAIRE|COMBI/.test(c))return "pantalon";
+  if(/JUPE/.test(c))return "jupe";
+  if(/ROBE/.test(c))return "robe";
+  if(/VESTE|MANTEAU|BLOUSON|PARKA|DOUDOUNE|TRENCH|KIMONO|BLAZER|PONCHO|CAPE/.test(c))return "veste";
+  if(/CHEMISE|BLOUSE|TUNIQUE/.test(c))return "chemise";
+  if(/PULL|GILET|SWEAT|CARDIGAN|MAILLE|TRICOT/.test(c))return "pull";
+  if(/TOP|T-SHIRT|TEE|DEBARDEUR|DÉBARDEUR|BODY|HAUT|CARACO/.test(c))return "top";
+  return null;
+}
+function elast(s){
+  s=(s||"").toLowerCase();
+  var m=/^\s*\d/.test(s)?s.match(/(\d+(?:[.,]\d+)?)\s*%\s*(?:d'|de\s+)?(?:[ée]last|spandex|lycra)/):s.match(/(?:[ée]last\w*|spandex|lycra)\s*:?\s*(\d+(?:[.,]\d+)?)\s*%/);
+  if(m)return parseFloat(m[1].replace(",","."))>=5?2:1;
+  return /maille|tricot|jersey|knit/.test(s)?1:0;
+}
+var ELF=["Sans élasticité","Légèrement extensible","Très extensible"];
+
+/* 存储（只在这台手机） */
+function load(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast("手机存储不可用")}}
+var items=load("m2.items",[]);   // 来自 MC：{ref,taille,cat,saison,comp}
+var store=load("m2.recs",{});     // key ref|taille，含删除标记
+var itemsAt=load("m2.itemsAt",0);
+var cfg=load("m2.cfg",{repo:"",token:"",name:""});
+var recs={};
+function rebuild(){recs={};Object.keys(store).forEach(function(k){if(store[k]&&!store[k].deleted)recs[k]=store[k]})}
+rebuild();
+(function(){try{var p=new URLSearchParams(location.search);if(p.get("gh")&&p.get("t")){cfg.repo=p.get("gh");cfg.token=p.get("t");save("m2.cfg",cfg);history.replaceState(null,"",location.pathname)}}catch(e){}})();
+var ui={tab:"saisie",cat:null,key:null,q:"",confirm:false};
+
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function num(v){if(v===""||v==null)return null;var n=parseFloat(String(v).replace(",","."));return isFinite(n)&&n>0?n:null}
+function fmt(n){return String(Math.round(n*10)/10).replace(".",",")}
+function toast(t){var el=$("toast");el.textContent=t;el.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(function(){el.classList.remove("show")},1600)}
+function key(ref,t){return ref+"|"+(t||"")}
+function itemBy(k){return items.find(function(i){return key(i.ref,i.taille)===k})}
+function cats(){var m={};items.forEach(function(i){var c=i.cat||"(sans catégorie)";(m[c]=m[c]||[]).push(i)});return m}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  document.querySelectorAll("nav.tabs button").forEach(function(b){b.setAttribute("aria-current",b.dataset.t===ui.tab?"page":"false")});
+  var done=Object.keys(recs).length;
+  $("count").textContent=items.length?done+" / "+items.length:done?done+" fiches":"";
+  if(ui.tab==="saisie"){ if(ui.key) form(); else if(ui.cat) refList(); else catGrid(); }
+  else if(ui.tab==="fiches") fiches();
+  else exportView();
+  $("back").hidden=!(ui.tab==="saisie"&&(ui.cat||ui.key));
+}
+function setTitle(t){$("title").textContent=t}
+function catGrid(){
+  setTitle("Mesures · 测量");
+  var C=cats(),names=Object.keys(C).sort();
+  if(!names.length){$("main").innerHTML='<div class="empty">先导入 MC 文件（在「导出 Export」页）。<br>Importez d\'abord le fichier MC.</div>';return}
+  $("main").innerHTML='<div class="cats">'+names.map(function(n){
+    var l=C[n],d=l.filter(function(i){return recs[key(i.ref,i.taille)]}).length;
+    return '<button class="cat'+(d===l.length?" done":"")+'" data-c="'+esc(n)+'"><b>'+esc(n)+'</b><span>'+d+' / '+l.length+'</span></button>';
+  }).join("")+'</div>';
+}
+function refList(){
+  setTitle(ui.cat);
+  var l=(cats()[ui.cat]||[]).slice().sort(function(a,b){return a.ref.localeCompare(b.ref,"fr",{numeric:true})});
+  var q=ui.q.trim().toUpperCase();
+  var f=l.filter(function(i){return !q||i.ref.toUpperCase().indexOf(q)>=0});
+  var todo=f.filter(function(i){return !recs[key(i.ref,i.taille)]}),done=f.filter(function(i){return recs[key(i.ref,i.taille)]});
+  function row(i,ok){return '<button class="item" data-k="'+esc(key(i.ref,i.taille))+'"><b>'+esc(i.ref)+'</b><small>'+esc(i.taille)+'</small>'+(ok?'<span class="ok">✓</span>':'')+'</button>'}
+  $("main").innerHTML='<input class="search" id="q" type="search" placeholder="REF…" value="'+esc(ui.q)+'" aria-label="搜索 REF">'+
+    '<div class="list">'+(todo.length?todo.map(function(i){return row(i,0)}).join(""):'<div class="empty">这个分类量完了 ✓</div>')+'</div>'+
+    (done.length?'<div class="h2">已量 · Mesurés</div><div class="list">'+done.map(function(i){return row(i,1)}).join("")+'</div>':"");
+  var qi=$("q");qi.addEventListener("input",function(){ui.q=qi.value;var p=qi.selectionStart;refList();var n=$("q");n.focus();n.setSelectionRange(p,p)});
+}
+function form(){
+  var it=itemBy(ui.key)||{ref:ui.key.split("|")[0],taille:ui.key.split("|")[1],cat:ui.cat};
+  var r=ui.draft||recs[ui.key]||null;
+  var t=r?r.tpl:(tplOf(it.cat)||"top");
+  var el=r?r.elastique:(t==="pantalon"||t==="jupe");
+  setTitle(it.cat||"Mesures");
+  var T=TPL[t];
+  var html='<div class="form"><div class="fhead"><b>'+esc(it.ref)+'</b><span>'+esc(it.taille)+(it.saison?" · "+esc(it.saison):"")+'</span></div>';
+  if(!tplOf(it.cat)||(r&&r.tpl!==tplOf(it.cat))) html+='<select class="t" id="tpl" aria-label="版型模板">'+Object.keys(TPL).map(function(k){return '<option value="'+k+'"'+(k===t?" selected":"")+'>'+TPL[k].n+'</option>'}).join("")+'</select>';
+  html+='<svg class="dia" viewBox="20 40 190 205" role="img" aria-label="'+T.n+'">'+DIA[t]+'</svg>';
+  if(t==="pantalon"||t==="jupe") html+='<div class="tog"><span>松紧腰？Taille élastique</span><div class="sw"><button data-el="1" aria-pressed="'+el+'">是 Oui</button><button data-el="0" aria-pressed="'+!el+'">否 Non</button></div></div>';
+  html+='<div class="fields">';
+  T.f.forEach(function(f){
+    if(f[4]===2&&!el) return;
+    var v=r&&r.m[f[1]]!=null?fmt(r.m[f[1]]):"";
+    html+='<div class="fld" data-k="'+f[1]+'"><span class="let">'+f[0]+'</span><label for="i-'+f[1]+'">'+f[2]+(f[4]?"":" <small>选填 · facultatif</small>")+'<small>'+f[3]+'</small></label><input id="i-'+f[1]+'" inputmode="decimal" enterkeyhint="next" value="'+v+'" placeholder="cm" autocomplete="off"></div>';
+  });
+  html+='<div class="fld" data-k="poids"><span class="let g">g</span><label for="i-poids">重量<small>Poids unitaire (g)</small></label><input id="i-poids" inputmode="numeric" enterkeyhint="done" value="'+(r&&r.poids?r.poids:"")+'" placeholder="g" autocomplete="off"></div>';
+  html+='</div><div class="msg" id="msg"></div><button class="save" id="save">保存，下一款 · Enregistrer et suivant</button>'+(recs[ui.key]?'<button class="sec" id="del">删除这条 · Supprimer</button>':'')+'</div>';
+  $("main").innerHTML=html;
+  ui.tpl=t;ui.el=el;ui.confirm=false;
+  if($("tpl")) $("tpl").addEventListener("change",function(e){var t2=e.target.value,m=readM();ui.draft={tpl:t2,elastique:(t2==="pantalon"||t2==="jupe"),m:{},poids:m.poids};form()});
+  document.querySelectorAll(".sw button").forEach(function(b){b.addEventListener("click",function(){var m=readM();ui.draft={tpl:ui.tpl,elastique:b.dataset.el==="1",m:m,poids:m.poids};form()})});
+  var ins=[].slice.call(document.querySelectorAll(".fields input"));
+  ins.forEach(function(inp,i){inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();if(ins[i+1])ins[i+1].focus();else $("save").click()}});inp.addEventListener("input",function(){ui.confirm=false})});
+  $("save").addEventListener("click",doSave);
+  if($("del")) $("del").addEventListener("click",function(){var b=$("del");if(!b.dataset.s){b.dataset.s=1;b.textContent="再点一次确认删除";return}store[ui.key]={deleted:true,at:new Date().toISOString(),by:cfg.name||""};save("m2.recs",store);rebuild();push();ui.key=null;toast("已删除");render()});
+  if(ins[0]&&!recs[ui.key]&&!ui.draft) setTimeout(function(){ins[0].focus()},60);
+}
+function readM(){var m={};document.querySelectorAll(".fields input").forEach(function(i){var k=i.id.slice(2),n=num(i.value);if(n!=null)m[k]=n});return m}
+function doSave(){
+  var m=readM(),T=TPL[ui.tpl],miss=[],warn=[],msg=$("msg");
+  if(cfg.repo&&!cfg.name){msg.innerHTML="先在「设置 Réglages」页填你的名字";msg.classList.add("show");return}
+  document.querySelectorAll(".fld").forEach(function(x){x.classList.remove("warn")});
+  T.f.forEach(function(f){if((f[4]===1||(f[4]===2&&ui.el))&&m[f[1]]==null)miss.push(f[0]+" "+f[2])});
+  if(m.poids==null)miss.push("重量");
+  if(miss.length){msg.innerHTML="<b>还没填：</b>"+miss.join("、");msg.classList.add("show");return}
+  Object.keys(m).forEach(function(k){var r=RANGE[k];if(r&&(m[k]<r[0]||m[k]>r[1])){warn.push(k==="poids"?"重量 "+m[k]+" g":fmt(m[k])+" cm");var el=document.querySelector('.fld[data-k="'+k+'"]');if(el)el.classList.add("warn")}});
+  if(ui.el&&m.taille_etiree!=null&&m.taille_repos!=null&&m.taille_etiree<m.taille_repos)warn.push("拉伸腰宽比自然腰宽还小");
+  if(warn.length&&!ui.confirm){msg.innerHTML="<b>请再量一次：</b>"+warn.join("、")+"<br>没错就再点一次保存。";msg.classList.add("show");ui.confirm=true;return}
+  var poids=Math.round(m.poids);delete m.poids;
+  if(!ui.el){delete m.taille_etiree}
+  var it=itemBy(ui.key);
+  store[ui.key]={tpl:ui.tpl,elastique:ui.el,m:m,poids:poids,at:new Date().toISOString(),cat:it?it.cat:ui.cat,by:cfg.name||""};
+  save("m2.recs",store);rebuild();push();
+  toast("✓ "+ui.key.split("|")[0]);
+  // 同分类下一款
+  var l=(cats()[ui.cat]||[]).slice().sort(function(a,b){return a.ref.localeCompare(b.ref,"fr",{numeric:true})});
+  var nx=l.find(function(i){return !recs[key(i.ref,i.taille)]});
+  ui.key=nx?key(nx.ref,nx.taille):null;ui.draft=null;
+  if(!nx)toast("这个分类量完了 ✓");
+  render();window.scrollTo(0,0);
+}
+function frText(k){
+  var r=recs[k],it=itemBy(k)||{ref:k.split("|")[0],taille:k.split("|")[1]};if(!r)return"";
+  var L=[],ts=(it.taille||"").replace(/\s/g,""),mm=ts.match(/^TU(\d{2})-?(\d{2})$/i);
+  if(mm)L.push("Taille unique : convient du "+mm[1]+" au "+mm[2]);else if(ts)L.push("Taille : "+ts);
+  if(["top","chemise","pull","veste","robe"].indexOf(r.tpl)>=0)L.push("Porté sur un mannequin taille 46");
+  var p=TPL[r.tpl].f.filter(function(f){return r.m[f[1]]!=null}).map(function(f){return FRN[f[1]]+" "+fmt(r.m[f[1]])+" cm"});
+  if(p.length)L.push("Mesures à plat : "+p.join(" · ")+" (tour = largeur × 2)");
+  L.push("Élasticité : "+ELF[elast(it.comp)]);
+  return L.join("\n");
+}
+function fiches(){
+  setTitle("记录 · Fiches");
+  var ks=Object.keys(recs);
+  if(!ks.length){$("main").innerHTML='<div class="empty">还没有记录 · Aucune fiche</div>';return}
+  var q=ui.q.trim().toUpperCase(),g={};
+  ks.filter(function(k){return !q||k.toUpperCase().indexOf(q)>=0}).forEach(function(k){var c=recs[k].cat||"—";(g[c]=g[c]||[]).push(k)});
+  $("main").innerHTML='<input class="search" id="q" type="search" placeholder="REF…" value="'+esc(ui.q)+'" aria-label="搜索 REF">'+Object.keys(g).sort().map(function(c){
+    return '<div class="h2">'+esc(c)+'</div><div class="list">'+g[c].sort().map(function(k){var r=recs[k];return '<button class="item" data-edit="'+esc(k)+'"><b>'+esc(k.split("|")[0])+'</b><small>'+esc(k.split("|")[1])+' · '+r.poids+' g'+(r.by?' · '+esc(r.by):'')+'</small></button>'}).join("")+'</div>';
+  }).join("");
+  var qi=$("q");qi.addEventListener("input",function(){ui.q=qi.value;var p=qi.selectionStart;fiches();var n=$("q");n.focus();n.setSelectionRange(p,p)});
+}
+function exportView(){
+  setTitle("设置 · Réglages");
+  $("main").innerHTML=
+   '<div class="card"><h2>1. 导入 MC 文件 · Fichier MC</h2><p>MC 导出的 Modèle d\'article。重新导入会更新款号清单，已量的数据不会丢。</p><input type="file" id="mc" accept=".xlsx,.xls"><p id="mcinfo" style="margin-top:8px">'+(items.length?"当前清单："+items.length+" 个款号/尺码":"")+'</p></div>'+
+   '<div class="card"><h2>2. 导出测量结果</h2><p>Excel 文件：每行一个款号 + 尺码，含重量、各项尺寸和法语尺码文字。</p><button class="btn" id="xl">导出 Excel · Exporter</button><button class="btn l" id="fr">复制全部法语文字</button></div>'+
+   '<div class="card"><h2>3. 同步到 GitHub</h2><p>每个人量的都会自动存到 GitHub 私有仓库，所有手机都能看到。</p>'+
+   '<label for="nm" style="font-size:13px">你的名字 · Votre nom</label><input class="t" id="nm" value="'+esc(cfg.name)+'" autocomplete="off">'+
+   '<label for="rp" style="font-size:13px">仓库 · Dépôt（用户名/仓库名）</label><input class="t" id="rp" placeholder="ex. monnom/cmelodie-mesures-data" value="'+esc(cfg.repo)+'" autocomplete="off">'+
+   '<label for="tk" style="font-size:13px">Token</label><input class="t" id="tk" type="password" value="'+esc(cfg.token)+'" autocomplete="off">'+
+   '<button class="btn" id="sv">保存并同步 · Enregistrer</button><button class="btn l" id="lk">复制员工链接 · Lien équipe</button>'+
+   '<p style="margin-top:8px">员工链接里带着 token，只发给自己人。员工打开后只需要填名字。</p></div>';
+  $("mc").addEventListener("change",importMC);
+  $("nm").addEventListener("change",function(e){cfg.name=e.target.value.trim();save("m2.cfg",cfg);push()});
+  $("sv").addEventListener("click",function(){cfg.name=$("nm").value.trim();cfg.repo=$("rp").value.trim().replace(/^https?:\/\/github.com\//,"").replace(/\/$/,"");cfg.token=$("tk").value.trim();save("m2.cfg",cfg);if(!cfgOk()){toast("仓库和 token 都要填");return}pull(true).then(push)});
+  $("lk").addEventListener("click",function(){if(!cfgOk()){toast("先填好仓库和 token");return}copy(location.origin+location.pathname+"?gh="+encodeURIComponent(cfg.repo)+"&t="+encodeURIComponent(cfg.token))});
+  $("xl").addEventListener("click",exportXL);
+  $("fr").addEventListener("click",function(){var t=Object.keys(recs).sort().map(function(k){return k.split("|")[0]+"\n"+frText(k)}).join("\n\n");if(!t){toast("还没有记录");return}copy(t)});
+}
+function readXL(f,cb){var rd=new FileReader();rd.onload=function(){try{var wb=XLSX.read(new Uint8Array(rd.result),{type:"array"});cb(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null}))}catch(e){toast("读取失败："+e.message)}};rd.readAsArrayBuffer(f)}
+function importMC(e){
+  var f=e.target.files[0];if(!f)return;
+  readXL(f,function(rows){
+    var hi=rows.findIndex(function(r){return r&&r.some(function(c){return String(c||"").trim()==="Référence"})});
+    if(hi<0){toast("找不到 Référence 表头");return}
+    var H=rows[hi].map(function(c){return String(c||"").trim()}),c=function(n){return H.indexOf(n)};
+    var ix={ref:c("Référence"),cat:c("Catégorie"),t:c("Taille"),s:c("Saison"),y:c("Année"),comp:c("Composition matérielle")};
+    var seen={},out=[];
+    rows.slice(hi+1).forEach(function(r){
+      if(!r||r[ix.ref]==null)return;var ref=String(r[ix.ref]).trim();if(!ref)return;
+      var t=String(r[ix.t]||"").trim(),k=key(ref,t);if(seen[k])return;seen[k]=1;
+      var s=[r[ix.y],r[ix.s]].filter(function(x){return x!=null&&x!==""}).join(" ");
+      out.push({ref:ref,taille:t,cat:String(r[ix.cat]||"").trim(),saison:s,comp:String(r[ix.comp]||"").trim()});
+    });
+    items=out;itemsAt=Date.now();save("m2.items",items);save("m2.itemsAt",itemsAt);pushItems();$("mcinfo").textContent="已导入 "+out.length+" 个款号/尺码";toast("导入完成");$("count").textContent=Object.keys(recs).length+" / "+items.length;
+  });
+  e.target.value="";
+}
+var HEAD=["REF","Taille","Categorie","Saison","Gabarit","Taille_elastique","Poids_g"].concat(COLS.map(function(k){return k+"_cm"})).concat(["Texte_FR","Updated_at"]);
+function exportXL(){
+  var ks=Object.keys(recs).sort();if(!ks.length){toast("还没有记录");return}
+  var aoa=[HEAD];
+  ks.forEach(function(k){var r=recs[k],it=itemBy(k)||{};var p=k.split("|");
+    aoa.push([p[0],p[1],r.cat||it.cat||"",it.saison||"",r.tpl,r.elastique?"oui":"non",r.poids].concat(COLS.map(function(c){return r.m[c]!=null?r.m[c]:null})).concat([frText(k),r.at||""]));
+  });
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  // REF 和 Taille 存成文本
+  for(var i=1;i<aoa.length;i++){["A","B"].forEach(function(col){var a=ws[col+(i+1)];if(a){a.t="s";a.v=String(a.v)}})}
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Mesures");
+  var d=new Date(),n="mesures_"+d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+".xlsx";
+  try{XLSX.writeFile(wb,n);toast("已导出 "+ks.length+" 条")}catch(e){toast("导出失败："+e.message)}
+}
+function copy(t){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast("已复制")},fb);else fb();function fb(){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast("已复制")}catch(e){toast("复制失败")}a.remove()}}
+
+/* ---------- GitHub 同步 ---------- */
+function cfgOk(){return !!(cfg.repo&&cfg.token&&/^[^/]+\/[^/]+$/.test(cfg.repo))}
+function setSync(c,t){var el=$("sync");el.className="chip"+(c?" "+c:"");el.textContent=t}
+function api(path,opt){opt=opt||{};opt.headers={"Authorization":"Bearer "+cfg.token,"Accept":"application/vnd.github+json"};
+  return fetch("https://api.github.com/repos/"+cfg.repo+"/contents/"+path,opt)}
+function b64e(s){return btoa(unescape(encodeURIComponent(s)))}
+function b64d(s){return decodeURIComponent(escape(atob(String(s).replace(/\s/g,""))))}
+function slug(n){return (n||"anon").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9\u4e00-\u9fff]+/g,"-").replace(/^-|-$/g,"")||"anon"}
+var busy=false,dirty=load("m2.dirty",false),shas={};
+function stamp(){var d=new Date();return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)}
+function getJson(path){return api(path+"?t="+Date.now()).then(function(r){if(r.status===404)return null;if(!r.ok)throw new Error("GitHub "+r.status);return r.json()}).then(function(j){if(!j)return null;shas[path]=j.sha;return JSON.parse(b64d(j.content))})}
+function putJson(path,obj,msg){
+  return api(path,{method:"PUT",body:JSON.stringify({message:msg,content:b64e(JSON.stringify(obj)),sha:shas[path]})})
+    .then(function(r){if(r.status===409||r.status===422){return getJson(path).then(function(){return api(path,{method:"PUT",body:JSON.stringify({message:msg,content:b64e(JSON.stringify(obj)),sha:shas[path]})})})}return r})
+    .then(function(r){if(!r.ok)throw new Error("GitHub "+r.status);return r.json()}).then(function(j){shas[path]=j.content.sha})}
+function mergeIn(rec){var n=0;Object.keys(rec||{}).forEach(function(k){var a=store[k],b=rec[k];if(b&&(!a||(b.at||"")>(a.at||""))){store[k]=b;n++}});return n}
+function pull(force){
+  if(!cfgOk()){setSync("","本机");return Promise.resolve()}
+  if(busy&&!force)return Promise.resolve();
+  busy=true;setSync("","同步中…");
+  return api("data?t="+Date.now()).then(function(r){if(r.status===404)return [];if(!r.ok)throw new Error(r.status===401?"token 不对":"GitHub "+r.status);return r.json()})
+  .then(function(list){
+    var files=(list||[]).filter(function(f){return /\.json$/.test(f.name)});
+    return Promise.all(files.map(function(f){return getJson("data/"+f.name).then(function(o){return{name:f.name,o:o}})}));
+  }).then(function(res){
+    res.forEach(function(x){if(!x.o)return;
+      if(x.name==="items.json"){if((x.o.at||0)>itemsAt){items=x.o.list||[];itemsAt=x.o.at;save("m2.items",items);save("m2.itemsAt",itemsAt)}}
+      else mergeIn(x.o.recs);
+    });
+    save("m2.recs",store);rebuild();busy=false;
+    setSync("ok","✓ "+stamp());
+    if(!ui.key)render();else $("count").textContent=Object.keys(recs).length+" / "+items.length;
+    if(dirty)return push();
+  }).catch(function(e){busy=false;setSync("warn",e.message)});
+}
+function push(){
+  if(!cfgOk()){setSync("","本机");return Promise.resolve()}
+  if(!cfg.name){setSync("warn","未填名字");return Promise.resolve()}
+  if(busy){dirty=true;save("m2.dirty",true);return Promise.resolve()}
+  busy=true;dirty=false;setSync("","上传中…");
+  var path="data/mesures-"+slug(cfg.name)+".json",mine={};
+  Object.keys(store).forEach(function(k){if(store[k].by===cfg.name)mine[k]=store[k]});
+  var p=shas[path]?Promise.resolve():getJson(path);
+  return p.then(function(){return putJson(path,{name:cfg.name,recs:mine},"mesures "+cfg.name)})
+  .then(function(){busy=false;setSync("ok","✓ "+stamp());if(dirty)return push();save("m2.dirty",false)})
+  .catch(function(e){busy=false;dirty=true;save("m2.dirty",true);setSync("warn","未上传")});
+}
+function pushItems(){
+  if(!cfgOk())return;
+  getJson("data/items.json").catch(function(){}).then(function(){return putJson("data/items.json",{at:itemsAt,list:items},"清单 MC")})
+  .then(function(){toast("清单已同步给所有手机")}).catch(function(){toast("清单上传失败，稍后再导入一次")});
+}
+setInterval(function(){if(document.visibilityState==="visible")pull()},60000);
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")pull()});
+window.addEventListener("online",function(){push()});
+
+/* 事件 */
+$("main").addEventListener("click",function(e){
+  var c=e.target.closest("[data-c]");if(c){ui.cat=c.dataset.c;ui.q="";render();return}
+  var k=e.target.closest("[data-k].item");if(k){ui.key=k.dataset.k;ui.draft=null;render();window.scrollTo(0,0);return}
+  var ed=e.target.closest("[data-edit]");if(ed){ui.tab="saisie";ui.key=ed.dataset.edit;ui.draft=null;ui.cat=recs[ui.key].cat||(itemBy(ui.key)||{}).cat;ui.q="";render();window.scrollTo(0,0)}
+});
+$("back").addEventListener("click",function(){ui.draft=null;if(ui.key)ui.key=null;else{ui.cat=null;ui.q=""}render()});
+document.querySelectorAll("nav.tabs button").forEach(function(b){b.addEventListener("click",function(){ui.tab=b.dataset.t;ui.q="";if(b.dataset.t==="saisie"&&ui.tab==="saisie"&&!ui.key){}render();window.scrollTo(0,0)})});
+
+window.__m={tplOf:tplOf,elast:elast,frText:frText,pull:function(){return pull(true)}};
+render();
+pull();
+})();
+</script>
+</body>
+</html>
