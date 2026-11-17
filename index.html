@@ -144,7 +144,7 @@ var cfg=load("m2.cfg",{repo:"",token:"",name:""});
 var recs={};
 function rebuild(){recs={};Object.keys(store).forEach(function(k){if(store[k]&&!store[k].deleted)recs[k]=store[k]})}
 rebuild();
-(function(){try{var p=new URLSearchParams(location.search);if(p.get("gh")&&p.get("t")){cfg.repo=p.get("gh");cfg.token=p.get("t");save("m2.cfg",cfg);history.replaceState(null,"",location.pathname)}}catch(e){}})();
+(function(){try{var p=new URLSearchParams(location.search);if(p.get("gh")&&p.get("t")){cfg.repo=p.get("gh");cfg.token=p.get("t");save("m2.cfg",cfg)}}catch(e){}})();
 var ui={tab:"saisie",cat:null,key:null,q:"",confirm:false,sea:load("m2.sea",[]),fromSearch:false};
 
 var $=function(id){return document.getElementById(id)};
