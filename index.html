@@ -15,19 +15,24 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.4;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.4}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 14px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(8px + env(safe-area-inset-top)) 14px 0;border-bottom:1px solid var(--line)}
+.hrow{display:flex;align-items:center;gap:8px}
 header h1{font-size:18px;margin:0;flex:1}
 .back{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 12px}
 .chip{font-size:12px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--line);color:var(--muted);white-space:nowrap}.chip.ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}.chip.warn{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
 .count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 main{padding:12px 14px;max-width:640px;margin:0 auto}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);padding-bottom:env(safe-area-inset-bottom)}
-nav.tabs button{border:0;background:none;padding:12px 4px;font-size:14px;color:var(--muted)}
-nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:700}
+nav.tabs{display:grid;grid-template-columns:repeat(3,1fr);margin-top:6px}
+nav.tabs button{border:0;background:none;padding:9px 4px;font-size:14px;color:var(--muted);border-bottom:2px solid transparent}
+nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:700;border-bottom-color:var(--accent)}
+.seasons{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;scrollbar-width:none}
+.seasons button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;font-size:13px}
+.seasons button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.item .tag{font-size:12px;color:var(--muted)}
 .cats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .cat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left}
 .cat b{display:block;font-size:15px}
@@ -71,23 +76,25 @@ nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:700}
 .btn.l{background:var(--surface);color:var(--ink);border:1px solid var(--line);font-weight:500}
 input.t{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-bottom:8px}
 select.t{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
-.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
 </head>
 <body>
 <header>
-  <button class="back" id="back" hidden aria-label="返回">←</button>
-  <h1 id="title">Mesures · 测量</h1>
-  <span class="count" id="count"></span><span class="chip" id="sync"></span>
+  <div class="hrow">
+    <button class="back" id="back" hidden aria-label="返回">←</button>
+    <h1 id="title">Mesures · 测量</h1>
+    <span class="count" id="count"></span><span class="chip" id="sync"></span>
+  </div>
+  <nav class="tabs">
+    <button data-t="saisie" aria-current="page">录入 Saisie</button>
+    <button data-t="fiches">记录 Fiches</button>
+    <button data-t="export">设置 Réglages</button>
+  </nav>
 </header>
 <main id="main"></main>
-<nav class="tabs">
-  <button data-t="saisie" aria-current="page">录入 Saisie</button>
-  <button data-t="fiches">记录 Fiches</button>
-  <button data-t="export">设置 Réglages</button>
-</nav>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -138,7 +145,7 @@ var recs={};
 function rebuild(){recs={};Object.keys(store).forEach(function(k){if(store[k]&&!store[k].deleted)recs[k]=store[k]})}
 rebuild();
 (function(){try{var p=new URLSearchParams(location.search);if(p.get("gh")&&p.get("t")){cfg.repo=p.get("gh");cfg.token=p.get("t");save("m2.cfg",cfg);history.replaceState(null,"",location.pathname)}}catch(e){}})();
-var ui={tab:"saisie",cat:null,key:null,q:"",confirm:false};
+var ui={tab:"saisie",cat:null,key:null,q:"",confirm:false,sea:load("m2.sea",[]),fromSearch:false};
 
 var $=function(id){return document.getElementById(id)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -147,7 +154,9 @@ function fmt(n){return String(Math.round(n*10)/10).replace(".",",")}
 function toast(t){var el=$("toast");el.textContent=t;el.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(function(){el.classList.remove("show")},1600)}
 function key(ref,t){return ref+"|"+(t||"")}
 function itemBy(k){return items.find(function(i){return key(i.ref,i.taille)===k})}
-function cats(){var m={};items.forEach(function(i){var c=i.cat||"(sans catégorie)";(m[c]=m[c]||[]).push(i)});return m}
+function inSeason(i){return !ui.sea.length||ui.sea.indexOf(i.saison)>=0}
+function seasons(){var m={};items.forEach(function(i){if(i.saison)m[i.saison]=1});return Object.keys(m).sort().reverse()}
+function cats(){var m={};items.filter(inSeason).forEach(function(i){var c=i.cat||"(sans catégorie)";(m[c]=m[c]||[]).push(i)});return m}
 
 /* ---------- 渲染 ---------- */
 function render(){
@@ -162,12 +171,29 @@ function render(){
 function setTitle(t){$("title").textContent=t}
 function catGrid(){
   setTitle("Mesures · 测量");
+  if(!items.length){$("main").innerHTML='<div class="empty">先导入 MC 文件（在「设置 Réglages」页）。<br>Importez d\'abord le fichier MC.</div>';return}
+  var S=seasons();
+  $("main").innerHTML='<input class="search" id="gq" type="search" placeholder="搜索所有款号 · Chercher une REF" value="'+esc(ui.q)+'" aria-label="搜索所有款号" autocomplete="off">'+
+    '<div class="seasons" role="group" aria-label="季节">'+['<button data-s="" aria-pressed="'+!ui.sea.length+'">全部季节</button>'].concat(S.map(function(x){return '<button data-s="'+esc(x)+'" aria-pressed="'+(ui.sea.indexOf(x)>=0)+'">'+esc(x)+'</button>'})).join("")+'</div>'+
+    '<div id="res"></div>';
+  var gq=$("gq");
+  gq.addEventListener("input",function(){ui.q=gq.value;drawRes()});
+  document.querySelectorAll(".seasons button").forEach(function(b){b.addEventListener("click",function(){var x=b.dataset.s;if(!x)ui.sea=[];else{var i=ui.sea.indexOf(x);if(i>=0)ui.sea.splice(i,1);else ui.sea.push(x)}save("m2.sea",ui.sea);catGrid()})});
+  drawRes();
+}
+function drawRes(){
+  var q=ui.q.trim().toUpperCase(),R=$("res");
+  if(q){
+    var hits=items.filter(function(i){return i.ref.toUpperCase().indexOf(q)>=0}).sort(function(a,b){return a.ref.localeCompare(b.ref,"fr",{numeric:true})}).slice(0,60);
+    R.innerHTML=hits.length?'<div class="list">'+hits.map(function(i){var k=key(i.ref,i.taille),ok=recs[k];
+      return '<button class="item" data-k="'+esc(k)+'" data-src="search"><b>'+esc(i.ref)+'</b><span class="tag">'+esc(i.cat)+(i.saison?' · '+esc(i.saison):'')+'</span><small>'+esc(i.taille)+'</small>'+(ok?'<span class="ok">✓</span>':'')+'</button>'}).join("")+'</div>':'<div class="empty">没找到 · Aucun résultat</div>';
+    return;
+  }
   var C=cats(),names=Object.keys(C).sort();
-  if(!names.length){$("main").innerHTML='<div class="empty">先导入 MC 文件（在「导出 Export」页）。<br>Importez d\'abord le fichier MC.</div>';return}
-  $("main").innerHTML='<div class="cats">'+names.map(function(n){
+  R.innerHTML=names.length?'<div class="cats">'+names.map(function(n){
     var l=C[n],d=l.filter(function(i){return recs[key(i.ref,i.taille)]}).length;
     return '<button class="cat'+(d===l.length?" done":"")+'" data-c="'+esc(n)+'"><b>'+esc(n)+'</b><span>'+d+' / '+l.length+'</span></button>';
-  }).join("")+'</div>';
+  }).join("")+'</div>':'<div class="empty">这个季节没有款</div>';
 }
 function refList(){
   setTitle(ui.cat);
@@ -205,6 +231,7 @@ function form(){
   if($("tpl")) $("tpl").addEventListener("change",function(e){var t2=e.target.value,m=readM();ui.draft={tpl:t2,elastique:(t2==="pantalon"||t2==="jupe"),m:{},poids:m.poids};form()});
   document.querySelectorAll(".sw button").forEach(function(b){b.addEventListener("click",function(){var m=readM();ui.draft={tpl:ui.tpl,elastique:b.dataset.el==="1",m:m,poids:m.poids};form()})});
   var ins=[].slice.call(document.querySelectorAll(".fields input"));
+  ins.forEach(function(inp){inp.addEventListener("focus",function(){setTimeout(function(){inp.scrollIntoView({block:"center",behavior:"smooth"})},250)})});
   ins.forEach(function(inp,i){inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();if(ins[i+1])ins[i+1].focus();else $("save").click()}});inp.addEventListener("input",function(){ui.confirm=false})});
   $("save").addEventListener("click",doSave);
   if($("del")) $("del").addEventListener("click",function(){var b=$("del");if(!b.dataset.s){b.dataset.s=1;b.textContent="再点一次确认删除";return}store[ui.key]={deleted:true,at:new Date().toISOString(),by:cfg.name||""};save("m2.recs",store);rebuild();push();ui.key=null;toast("已删除");render()});
@@ -229,6 +256,7 @@ function doSave(){
   toast("✓ "+ui.key.split("|")[0]);
   // 同分类下一款
   var l=(cats()[ui.cat]||[]).slice().sort(function(a,b){return a.ref.localeCompare(b.ref,"fr",{numeric:true})});
+  if(ui.fromSearch){ui.key=null;ui.cat=null;ui.q="";ui.draft=null;ui.fromSearch=false;render();window.scrollTo(0,0);var g=$("gq");if(g)g.focus();return}
   var nx=l.find(function(i){return !recs[key(i.ref,i.taille)]});
   ui.key=nx?key(nx.ref,nx.taille):null;ui.draft=null;
   if(!nx)toast("这个分类量完了 ✓");
@@ -268,7 +296,7 @@ function exportView(){
    '<p style="margin-top:8px">员工链接里带着 token，只发给自己人。员工打开后只需要填名字。</p></div>';
   $("mc").addEventListener("change",importMC);
   $("nm").addEventListener("change",function(e){cfg.name=e.target.value.trim();save("m2.cfg",cfg);push()});
-  $("sv").addEventListener("click",function(){cfg.name=$("nm").value.trim();cfg.repo=$("rp").value.trim().replace(/^https?:\/\/github.com\//,"").replace(/\/$/,"");cfg.token=$("tk").value.trim();save("m2.cfg",cfg);if(!cfgOk()){toast("仓库和 token 都要填");return}pull(true).then(push)});
+  $("sv").addEventListener("click",function(){cfg.name=$("nm").value.trim();cfg.repo=fixRepo($("rp").value);if(cfg.name.indexOf("/")>=0&&!cfg.repo){cfg.repo=fixRepo(cfg.name);cfg.name=""}cfg.token=$("tk").value.trim();save("m2.cfg",cfg);if(!cfg.name){toast("请填你的名字");return}if(!cfg.token){toast("请填 token");return}if(!cfgOk()){toast("仓库格式：用户名/cmelodie-mesures-data");return}$("rp").value=cfg.repo;pull(true).then(push)});
   $("lk").addEventListener("click",function(){if(!cfgOk()){toast("先填好仓库和 token");return}copy(location.origin+location.pathname+"?gh="+encodeURIComponent(cfg.repo)+"&t="+encodeURIComponent(cfg.token))});
   $("xl").addEventListener("click",exportXL);
   $("fr").addEventListener("click",function(){var t=Object.keys(recs).sort().map(function(k){return k.split("|")[0]+"\n"+frText(k)}).join("\n\n");if(!t){toast("还没有记录");return}copy(t)});
@@ -309,6 +337,8 @@ function exportXL(){
 function copy(t){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast("已复制")},fb);else fb();function fb(){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast("已复制")}catch(e){toast("复制失败")}a.remove()}}
 
 /* ---------- GitHub 同步 ---------- */
+function fixRepo(v){v=String(v||"").trim().replace(/^https?:\/\/github.com\//,"").replace(/\.git$/,"").replace(/\/$/,"");
+  if(v&&v.indexOf("/")<0){var h=location.hostname.match(/^([^.]+)\.github\.io$/);if(h)v=h[1]+"/"+v}return v}
 function cfgOk(){return !!(cfg.repo&&cfg.token&&/^[^/]+\/[^/]+$/.test(cfg.repo))}
 function setSync(c,t){var el=$("sync");el.className="chip"+(c?" "+c:"");el.textContent=t}
 function api(path,opt){opt=opt||{};opt.headers={"Authorization":"Bearer "+cfg.token,"Accept":"application/vnd.github+json"};
@@ -367,10 +397,10 @@ window.addEventListener("online",function(){push()});
 /* 事件 */
 $("main").addEventListener("click",function(e){
   var c=e.target.closest("[data-c]");if(c){ui.cat=c.dataset.c;ui.q="";render();return}
-  var k=e.target.closest("[data-k].item");if(k){ui.key=k.dataset.k;ui.draft=null;render();window.scrollTo(0,0);return}
+  var k=e.target.closest("[data-k].item");if(k){ui.key=k.dataset.k;ui.draft=null;ui.fromSearch=k.dataset.src==="search";if(ui.fromSearch){var it0=itemBy(ui.key);ui.cat=it0?it0.cat:null}render();window.scrollTo(0,0);return}
   var ed=e.target.closest("[data-edit]");if(ed){ui.tab="saisie";ui.key=ed.dataset.edit;ui.draft=null;ui.cat=recs[ui.key].cat||(itemBy(ui.key)||{}).cat;ui.q="";render();window.scrollTo(0,0)}
 });
-$("back").addEventListener("click",function(){ui.draft=null;if(ui.key)ui.key=null;else{ui.cat=null;ui.q=""}render()});
+$("back").addEventListener("click",function(){ui.draft=null;if(ui.key&&ui.fromSearch){ui.key=null;ui.cat=null;ui.fromSearch=false;render();return}if(ui.key)ui.key=null;else{ui.cat=null;ui.q=""}render()});
 document.querySelectorAll("nav.tabs button").forEach(function(b){b.addEventListener("click",function(){ui.tab=b.dataset.t;ui.q="";if(b.dataset.t==="saisie"&&ui.tab==="saisie"&&!ui.key){}render();window.scrollTo(0,0)})});
 
 window.__m={tplOf:tplOf,elast:elast,frText:frText,pull:function(){return pull(true)}};
