@@ -334,7 +334,7 @@ function form(){
   html+='<div class="fields"><div class="fld" data-k="poids"><span class="let g">g</span><label for="i-poids">'+(isSet(ids)?tr("整套净重（克）","Poids net de l’ensemble (g)"):tr("单件净重（克）","Poids net unitaire (g)"))+'</label><input id="i-poids" inputmode="numeric" enterkeyhint="done" value="'+(r&&r.poids?r.poids:"")+'" placeholder="g" autocomplete="off"></div></div>';
   if(!ui.draft){ui.e=saved&&saved.e!=null?saved.e:elast(it.comp);ui.c=saved&&saved.c!=null?saved.c:null;ui.eAuto=!(saved&&saved.e!=null)}
   html+='<div class="tog" style="margin-top:12px"><span>'+tr("面料弹力","Élasticité du tissu")+(ui.eAuto?' <small style="color:var(--muted)">'+tr("（按成分预选）","(selon la composition)")+'</small>':'')+'</span></div><div class="sw seg3" id="sw-e">'+ELZ.map(function(z,i){return '<button data-e="'+i+'" aria-pressed="'+(ui.e===i)+'">'+tr(z,ELS[i])+'</button>'}).join("")+'</div>';
-  html+='<div class="tog" style="margin-top:10px"><span>'+tr("版型","Coupe")+' <small style="color:var(--muted)">'+tr("选填","facultatif")+'</small></span></div><div class="sw seg3" id="sw-c">'+CPZ.map(function(z,i){return '<button data-c="'+i+'" aria-pressed="'+(ui.c===i)+'">'+tr(z,CPF[i].charAt(0).toUpperCase()+CPF[i].slice(1))+'</button>'}).join("")+'</div>';
+  html+='<div class="tog" style="margin-top:10px"><span>'+tr("版型","Coupe")+' <small style="color:var(--muted)">'+tr("选填","facultatif")+'</small></span></div><div class="sw seg3" id="sw-c">'+CPZ.map(function(z,i){return '<button data-cp="'+i+'" aria-pressed="'+(ui.c===i)+'">'+tr(z,CPF[i].charAt(0).toUpperCase()+CPF[i].slice(1))+'</button>'}).join("")+'</div>';
   html+='<div class="msg" id="msg"></div><button class="save" id="save">'+tr("保存，下一个","Enregistrer et suivant")+'</button>';
   if(S.length>1&&!saved)html+='<button class="sec" id="skip">'+tr("这个码没货，跳过","Taille pas dispo, passer")+'</button>';
   if(saved)html+='<button class="sec" id="del">'+tr("删除这条","Supprimer")+'</button>';
@@ -346,7 +346,7 @@ function form(){
   document.querySelectorAll("#sw-s button").forEach(function(b){b.addEventListener("click",function(){redraw({sleeve:b.dataset.s})})});
   document.querySelectorAll("[data-opt]").forEach(function(b){b.addEventListener("click",function(){var box=document.querySelector('.opt[data-for="'+b.dataset.opt+'"]');box.hidden=!box.hidden;b.textContent=(box.hidden?"▸ ":"▾ ")+b.textContent.slice(2)})});
   document.querySelectorAll("#sw-e button").forEach(function(b){b.addEventListener("click",function(){ui.e=+b.dataset.e;ui.eAuto=false;document.querySelectorAll("#sw-e button").forEach(function(x){x.setAttribute("aria-pressed",String(x===b))})})});
-  document.querySelectorAll("#sw-c button").forEach(function(b){b.addEventListener("click",function(){var v=+b.dataset.c;ui.c=ui.c===v?null:v;document.querySelectorAll("#sw-c button").forEach(function(x){x.setAttribute("aria-pressed",String(+x.dataset.c===ui.c))})})});
+  document.querySelectorAll("#sw-c button").forEach(function(b){b.addEventListener("click",function(){var v=+b.dataset.cp;ui.c=ui.c===v?null:v;document.querySelectorAll("#sw-c button").forEach(function(x){x.setAttribute("aria-pressed",String(+x.dataset.cp===ui.c))})})});
   var ins=[].slice.call(document.querySelectorAll(".fields input"));
   ins.forEach(function(inp,i){
     inp.addEventListener("focus",function(){hl(inp);setTimeout(function(){inp.scrollIntoView({block:"center",behavior:"smooth"})},250)});
@@ -575,7 +575,7 @@ window.addEventListener("online",function(){push()});
 
 /* 事件 */
 $("main").addEventListener("click",function(e){
-  var c=e.target.closest("[data-c]");if(c){ui.cat=c.dataset.c;ui.q="";render();return}
+  var c=e.target.closest(".cat[data-c]");if(c){ui.cat=c.dataset.c;ui.q="";render();return}
   var k=e.target.closest("[data-k].item");if(k){ui.key=k.dataset.k;ui.draft=null;ui.fromSearch=k.dataset.src==="search";ui.fromTask=k.dataset.src==="task";if(ui.fromSearch||ui.fromTask){var it0=itemBy(ui.key);ui.cat=it0?it0.cat:null}render();window.scrollTo(0,0);return}
   var ed=e.target.closest("[data-edit]");if(ed){ui.tab="saisie";ui.key=ed.dataset.edit;ui.draft=null;ui.cat=recs[ui.key].cat||(itemBy(ui.key)||{}).cat;ui.q="";render();window.scrollTo(0,0)}
 });
