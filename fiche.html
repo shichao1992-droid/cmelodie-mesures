@@ -52,6 +52,17 @@ main{padding:12px 14px 40px;max-width:760px;margin:0 auto}
 .pics .ph{border-radius:10px;border:1px solid var(--line)}
 .dia{background:#fff;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;padding:4px}
 .dia svg{width:100%;height:auto;max-height:100%}
+.dia .val{font:700 15px Arial,sans-serif;fill:#E11D48;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.top2{display:grid;grid-template-columns:44% 1fr;gap:12px;margin:12px 0}
+.top2 .ph{border-radius:10px;border:1px solid var(--line)}
+.kv{display:grid;gap:6px;align-content:start;font-size:14px}
+.kv b{font-size:16px}
+.big{margin:8px 0 4px}
+.big .dia{padding:8px}
+.thumbs{display:flex;gap:8px;overflow-x:auto;margin:10px 0}
+.thumbs button{flex:none;width:64px;padding:0;border:2px solid var(--line);border-radius:8px;overflow:hidden;background:none}
+.thumbs button[aria-pressed="true"]{border-color:var(--accent)}
+.thumbs img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block}
 .sizes{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
 .sizes button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 12px;font-size:14px;font-weight:700}
 .sizes button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -276,9 +287,15 @@ function fiche(){
   var h='<div class="fiche"><div class="fh"><div><div class="brand">C\'Mélodie · '+tr("尺寸卡","Fiche mesures")+'</div><h2>'+esc(g.ref)+'</h2><div class="meta">'+esc(g.cat)+(g.saison?' · '+esc(g.saison):'')+'</div></div></div>';
   if(g.keys.length>1)h+='<div class="sizes noprint" role="group" aria-label="Tailles">'+g.keys.map(function(k){return '<button data-k="'+esc(k)+'" aria-pressed="'+(k===ui.key)+'">'+esc(k.split("|")[1])+'</button>'}).join("")+'</div>';
   h+='<div class="meta" style="margin-top:4px">'+tr("尺码","Taille")+' : <b>'+esc(taille)+'</b></div>';
-  var dias=r.ids.map(function(t){return '<div class="dia">'+SVG[t]+'</div>'}).join("");
-  h+='<div class="pics"><div class="ph">'+(p?'<img src="'+esc(p[0])+'" alt="'+esc(g.ref)+'">':tr("暂无照片","Pas de photo"))+'</div>'+(r.ids.length>1?'<div style="display:grid;gap:6px">'+dias+'</div>':dias)+'</div>';
-  if(p&&p.length>1)h+='<div class="pics noprint">'+p.slice(1,5).map(function(u){return '<div class="ph"><img loading="lazy" src="'+esc(u)+'" alt=""></div>'}).join("")+'</div>';
+  var e0=r.e!=null?r.e:elast(it.comp);
+  h+='<div class="top2"><div class="ph">'+(p?'<img src="'+esc(p[0])+'" alt="'+esc(g.ref)+'">':tr("暂无照片","Pas de photo"))+'</div><div class="kv">'+
+    '<div>'+tr("尺码","Taille")+'<br><b>'+esc(taille)+'</b></div>'+
+    '<div>'+tr(isSet(r.ids)?"整套净重":"单件净重",isSet(r.ids)?"Poids net ensemble":"Poids net")+'<br><b>'+r.poids+' g</b></div>'+
+    '<div>'+tr("面料弹力","Élasticité")+'<br><b>'+tr(ELZ[e0],ELF[e0])+'</b></div>'+
+    (r.c!=null?'<div>'+tr("版型","Coupe")+'<br><b>'+tr(CPZ[r.c],CPF[r.c])+'</b></div>':'')+
+    '</div></div>';
+  if(cfg.admin&&p&&p.length>1)h+='<div class="noprint" style="font-size:13px;color:var(--muted)">'+tr("管理员：点一张设为主图","Admin : touchez une photo pour la mettre en principale")+'</div><div class="thumbs noprint">'+p.map(function(u,i){return '<button data-pi="'+i+'" aria-pressed="'+(i===0)+'"><img loading="lazy" src="'+esc(u)+'" alt=""></button>'}).join("")+'</div>';
+  h+='<div class="big">'+r.ids.map(function(t){return (r.ids.length>1?'<div class="comp">'+esc(tr(CFG.templates[t].labelZh,CFG.templates[t].labelFr))+'</div>':'')+'<div class="dia" data-t="'+t+'">'+SVG[t]+'</div>'}).join("")+'</div>';
   var rows=rowsOf(r),lastT=null;
   h+='<div class="comp">'+tr("平铺尺寸（cm，衣服平放不拉伸）","Mesures à plat (cm, à plat sans étirer)")+'</div><table>';
   rows.forEach(function(x){
@@ -296,9 +313,36 @@ function fiche(){
   h+='<div class="note">'+tr("宽度是平铺半宽，围度 = 宽度 × 2。","Largeurs à plat : tour = largeur × 2.")+(r.by?' · '+tr("测量：","Mesuré par ")+esc(r.by):'')+(r.at?' · '+esc(String(r.at).slice(0,10)):'')+'</div>';
   h+='<div class="acts"><button class="btn" id="cp">'+tr("复制文字（发供应商）","Copier le texte")+'</button><button class="btn l" id="pr">'+tr("打印 / 存 PDF","Imprimer / PDF")+'</button></div></div>';
   $("main").innerHTML=h;
+  annotate(r);
+  document.querySelectorAll(".thumbs button").forEach(function(b){b.addEventListener("click",function(){setMain(g.ref,+b.dataset.pi)})});
   document.querySelectorAll(".sizes button").forEach(function(b){b.addEventListener("click",function(){ui.key=b.dataset.k;fiche()})});
   $("cp").addEventListener("click",function(){copy(textOf(g,r,taille,it,tags))});
   $("pr").addEventListener("click",function(){try{window.print()}catch(e){toast(tr("这个浏览器不能打印","Impression impossible ici"))}});
+}
+/* 在示意图的字母旁边直接写尺寸 */
+function annotate(r){
+  var NS="http://www.w3.org/2000/svg";
+  r.ids.forEach(function(t){
+    var box=document.querySelector('.dia[data-t="'+t+'"] svg');if(!box)return;
+    var vb=(box.getAttribute("viewBox")||"0 0 400 430").split(/\s+/).map(Number),W=vb[2];
+    fieldsOf(t,{elastic:r.elastic,sleeve:r.sleeve}).forEach(function(f){
+      var v=r.m&&r.m[f.k];if(v==null)return;
+      var g=box.querySelector('[data-field="'+f.k+'"]');if(!g)return;
+      var c=g.querySelector("circle.tag");if(!c)return;
+      var cx=+c.getAttribute("cx"),cy=+c.getAttribute("cy");
+      var txt=document.createElementNS(NS,"text");
+      var right=cx+13+58<=vb[0]+W;
+      txt.setAttribute("x",right?cx+13:cx-13);txt.setAttribute("y",cy+5);
+      txt.setAttribute("text-anchor",right?"start":"end");txt.setAttribute("class","val");
+      txt.textContent=fmt(v)+" cm";g.appendChild(txt);
+    });
+  });
+}
+function setMain(ref,i){
+  var p=(photos[ref]||[]).slice();if(!p[i])return;var u=p.splice(i,1)[0];p.unshift(u);photos[ref]=p;save("f.photos",photos);fiche();
+  var path="data/photos.json";
+  getJson(path).catch(function(){}).then(function(o){var map=(o&&o.map)||{};map[ref]=p;return api(path,{method:"PUT",body:JSON.stringify({message:"photo principale "+ref,content:b64e(JSON.stringify({at:Date.now(),map:map})),sha:shas[path]})})})
+  .then(function(rr){if(!rr.ok)throw 0;toast(tr("主图已保存","Photo principale enregistrée"))}).catch(function(){toast(tr("只保存在这台设备（token 不能写入）","Gardé sur cet appareil seulement"))});
 }
 function textOf(g,r,taille,it,tags){
   var L=["C'Mélodie · "+tr("尺寸卡","Fiche mesures"),tr("款号：","Réf. : ")+g.ref,tr("分类：","Catégorie : ")+g.cat,tr("尺码：","Taille : ")+taille,tr("平铺尺寸（cm）：","Mesures à plat (cm) :")];
